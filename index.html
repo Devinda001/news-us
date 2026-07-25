@@ -3,38 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live US News Feed</title>
-    <!-- Importing Tailwind CSS for modern styling -->
+    <title>US LIVE NEWS</title>
+    <!-- Importing Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Custom styling to truncate text and create a smooth pulse -->
     <style>
-        .line-clamp-3 {
+        /* Standardizing the font to a clean, professional system default */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .line-clamp-2 {
             display: -webkit-box;
-            -webkit-line-clamp: 3;
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;  
             overflow: hidden;
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+<body class="bg-white text-gray-800 antialiased">
     
-    <!-- Sticky Navigation Bar -->
-    <header class="bg-white shadow-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-black text-blue-900 flex items-center gap-3 tracking-tight">
-                🇺🇸 US News LIVE
-                <!-- Pulsing Red Dot -->
-                <span class="flex h-3 w-3 relative">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+    <!-- Professional, minimal navigation bar -->
+    <header class="bg-white border-b border-gray-300 sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-black flex items-center gap-2">
+                US LIVE NEWS
+                <!-- Subtle Pulsing Live Indicator -->
+                <span class="flex h-2.5 w-2.5 relative ml-1">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
                 </span>
             </h1>
-            <div class="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                Next update in: <span id="countdown" class="text-blue-600 font-bold w-6 inline-block text-center">60</span>s
+            <div class="text-sm text-gray-600">
+                Next update: <span id="countdown" class="font-semibold text-gray-900 w-5 inline-block text-center">60</span>s
             </div>
         </div>
     </header>
 
+    <!-- Main Content Area -->
+    <main class="max-w-4xl mx-auto px-4 py-6">
+        
+        <!-- Loading State -->
+        <div id="loader" class="text-center py-12 text-gray-500">
+            <p class="text-base font-medium">Loading latest updates...</p>
+        </div>
+
+        <!-- News Feed Container -->
+        <div id="news-grid" class="flex flex-col hidden">
+            <!-- News items will be dynamically injected here -->
+        </div>
+
+    </main>
+
+    <script>
+        const RSS_URL = 'https://rss.nytimes.com/services/xml/rss/nyt/US.xml';
+        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+        const REFRESH_INTERVAL_SECONDS = 60; 
+        let timeLeft = REFRESH_INTERVAL_SECONDS;
+
+        async function fetchNews() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    renderNews(data.items);
+                } else {
+                    console.error("API Error:", data.message);
+                }
+            } catch (error) {
+                console.error("Failed to fetch news:", error);
+            }
+        }
+
+        function renderNews(articles) {
+            const grid = document.getElementById('news-grid');
+            const loader = document.getElementById('loader');
+            
+            grid.innerHTML = ''; 
+            
+            articles.forEach(article => {
+                const imageUrl = article.enclosure && article.enclosure.link 
+                                    ? article.enclosure.link 
+                                    : 'https://placehold.co/400x300/eeeeee/999999?text=No+Image';
+                
+                const pubDate = new Date(article.pubDate).toLocaleString('en-US', {
+                    month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                // Updated HTML structure for a professional, list-based layout with smaller images
+                const cardHTML = `
+                    <article class="flex flex-col sm:flex-row gap-5 py-5 border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150 cursor-pointer" onclick="window.open('${article.link}', '_blank')">
+                        
+                        <!-- Smaller, standard-sized thumbnail image -->
+                        <div class="flex-shrink-0 w-full sm:w-48 h-32 overflow-hidden rounded bg-gray-100">
+                            <img src="${imageUrl}" alt="News thumbnail" class="w-full h-full object-cover">
+                        </div>
+                        
+                        <!-- Text Content with standard font sizing -->
+                        <div class="flex flex-col justify-start flex-grow">
+                            <h2 class="text-lg font-semibold text-gray-900 leading-snug mb-1 hover:underline">
+                                ${article.title}
+                            </h2>
+                            <p class="text-sm text-gray-700 mb-3 line-clamp-2">
+                                ${article.description || "Read the full story on the original publication site."}
+                            </p>
+                            
+                            <!-- Timestamp -->
+                            <div class="mt-auto text-xs text-gray-500 font-medium">
+                                ${pubDate}
+                            </div>
+                        </div>
+                        
+                    </article>
+                `;
+                
+                grid.insertAdjacentHTML('beforeend', cardHTML);
+            });
+
+            loader.classList.add('hidden');
+            grid.classList.remove('hidden');
+            timeLeft = REFRESH_INTERVAL_SECONDS;
+        }
+
+        function startTimer() {
+            const countdownEl = document.getElementById('countdown');
+            
+            setInterval(() => {
+                timeLeft--;
+                countdownEl.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    countdownEl.textContent = '--';
+                    fetchNews();
+                }
+            }, 1000);
+        }
+
+        fetchNews();
+        startTimer();
+    </script>
+</body>
+</html>
     <!-- Main Content Area -->
     <main class="max-w-7xl mx-auto px-4 py-8">
         
