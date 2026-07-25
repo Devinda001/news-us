@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live US News Feed</title>
+    <!-- Importing Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom styling to truncate text and create a smooth pulse -->
+    <style>
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;  
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+    
+    <!-- Sticky Navigation Bar -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-black text-blue-900 flex items-center gap-3 tracking-tight">
+                🇺🇸 US News LIVE
+                <!-- Pulsing Red Dot -->
+                <span class="flex h-3 w-3 relative">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                </span>
+            </h1>
+            <div class="text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                Next update in: <span id="countdown" class="text-blue-600 font-bold w-6 inline-block text-center">60</span>s
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <!-- Loading State -->
+        <div id="loader" class="text-center py-20 text-gray-500">
+            <p class="text-xl animate-pulse font-medium">Fetching the latest stories across the US...</p>
+        </div>
+
+        <!-- News Grid Container -->
+        <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 hidden">
+            <!-- News cards will be dynamically injected here by JavaScript -->
+        </div>
+
+    </main>
+
+    <script>
+        // The NYT US News RSS Feed URL
+        const RSS_URL = 'https://rss.nytimes.com/services/xml/rss/nyt/US.xml';
+        
+        // We use rss2json.com as a free proxy to convert the XML RSS feed into readable JSON
+        const API_URL = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(RSS_URL)}`;
+        
+        // Settings for the auto-refresh cycle
+        const REFRESH_INTERVAL_SECONDS = 60; 
+        let timeLeft = REFRESH_INTERVAL_SECONDS;
+
+        /**
+         * Fetches the latest news from the API
+         */
+        async function fetchNews() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    renderNews(data.items);
+                } else {
+                    console.error("API Error:", data.message);
+                }
+            } catch (error) {
+                console.error("Failed to fetch news:", error);
+            }
+        }
+
+        /**
+         * Parses the news data and injects HTML into the webpage
+         */
+        function renderNews(articles) {
+            const grid = document.getElementById('news-grid');
+            const loader = document.getElementById('loader');
+            
+            grid.innerHTML = ''; // Clear out the old articles for the refresh
+            
+            articles.forEach(article => {
+                // Look for an image, otherwise provide a gray placeholder box
+                const imageUrl = article.enclosure && article.enclosure.link 
+                                    ? article.enclosure.link 
+                                    : 'https://placehold.co/600x400/eeeeee/999999?text=US+News';
+                
+                // Format the timestamp to be readable
+                const pubDate = new Date(article.pubDate).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                // Create the HTML structure for each news card
+                const cardHTML = `
+                    <article class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col group cursor-pointer" onclick="window.open('${article.link}', '_blank')">
+                        <div class="overflow-hidden h-48">
+                            <img src="${imageUrl}" alt="News Image" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                        </div>
+                        <div class="p-5 flex flex-col flex-grow">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-widest rounded">Breaking</span>
+                            </div>
+                            <h2 class="text-lg font-bold leading-snug mb-2 text-gray-900 group-hover:text-blue-700 transition-colors">
+                                ${article.title}
+                            </h2>
+                            <p class="text-sm text-gray-600 mb-4 line-clamp-3">
+                                ${article.description || "Click to read the full story on this developing news topic."}
+                            </p>
+                            
+                            <!-- Card Footer -->
+                            <div class="mt-auto flex justify-between items-center text-xs text-gray-400 border-t pt-4">
+                                <span class="font-medium text-gray-500">🕒 ${pubDate}</span>
+                            </div>
+                        </div>
+                    </article>
+                `;
+                
+                // Add the card to the grid
+                grid.insertAdjacentHTML('beforeend', cardHTML);
+            });
+
+            // Hide the loader and show the grid
+            loader.classList.add('hidden');
+            grid.classList.remove('hidden');
+            
+            // Reset the countdown timer
+            timeLeft = REFRESH_INTERVAL_SECONDS;
+        }
+
+        /**
+         * Handles the visual countdown timer and triggers the refresh
+         */
+        function startTimer() {
+            const countdownEl = document.getElementById('countdown');
+            
+            setInterval(() => {
+                timeLeft--;
+                countdownEl.textContent = timeLeft;
+                
+                // When timer hits 0, fetch new data
+                if (timeLeft <= 0) {
+                    countdownEl.textContent = '--';
+                    fetchNews();
+                }
+            }, 1000);
+        }
+
+        // Initialize the app immediately on page load
+        fetchNews();
+        startTimer();
+    </script>
+</body>
+</html>
